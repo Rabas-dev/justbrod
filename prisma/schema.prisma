@@ -1,0 +1,67 @@
+// Brod Digital Loyalty — MVP schema
+// Postgres via Supabase. DATABASE_URL is the pooled (pgbouncer) connection used at runtime;
+// DIRECT_URL is the direct connection Prisma uses to run migrations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Program {
+  id               String   @id @default(cuid())
+  name             String   @default("Brod Rewards")
+  requiredStamps   Int      @default(7)
+  rewardName       String   @default("Free Sandwich")
+  rewardValidDays  Int      @default(14)
+  checkinFrequency String   @default("DAILY") // DAILY | UNLIMITED
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  checkIns CheckIn[]
+  rewards  Reward[]
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  qrToken   String   @unique @default(cuid()) // personal QR shown to cashier to receive a stamp
+  createdAt DateTime @default(now())
+
+  checkIns CheckIn[]
+  rewards  Reward[]
+}
+
+model CheckIn {
+  id          String   @id @default(cuid())
+  customerId  String
+  programId   String
+  checkinDate String   // YYYY-MM-DD, used for the daily-uniqueness constraint
+  createdAt   DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  program  Program  @relation(fields: [programId], references: [id])
+
+  @@unique([customerId, programId, checkinDate])
+}
+
+model Reward {
+  id          String    @id @default(cuid())
+  customerId  String
+  programId   String
+  code        String    @unique
+  rewardName  String
+  status      String    @default("UNLOCKED") // UNLOCKED | REDEEMED | EXPIRED
+  unlockedAt  DateTime  @default(now())
+  expiresAt   DateTime
+  redeemedAt  DateTime?
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  program  Program  @relation(fields: [programId], references: [id])
+}

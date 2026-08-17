@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Brod Digital Loyalty — MVP
 
-## Getting Started
+Mobile-first QR loyalty flow (scan → check-in → stamp → reward) plus a minimal admin panel, built per the Brod loyalty spec's cut-down v1 scope.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Next.js 15 (App Router) + TypeScript + Tailwind
+- Postgres via Supabase, accessed through Prisma
+- Framer Motion for the stamp/reward animations
+- Zod for request validation
+
+## Getting started
+
+Needs two Supabase Postgres connection strings in `.env` (already configured for this project):
+
+```
+DATABASE_URL="<Supabase Transaction pooler string, port 6543, ?pgbouncer=true appended>"
+DIRECT_URL="<Supabase Session pooler string, port 5432 — used for migrations>"
+ADMIN_PASSWORD="<pick something real before deploying>"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Note: Supabase's true "direct connection" host (`db.<ref>.supabase.co`) is IPv6-only on this project's tier, so `DIRECT_URL` points at the pooler's session-mode port (5432) instead — that's what Prisma migrations use here.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npx prisma migrate dev   # applies schema to Supabase (only needed after schema changes)
+npm run seed              # creates the default program + a demo QR code
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The seed command prints a scan URL like:
 
-## Learn More
+```
+http://localhost:3000/rewards?q=<token>
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open that URL to walk the customer flow. Admin is at `/admin` — password is `ADMIN_PASSWORD` in `.env` (defaults to `brod-admin-2026`, change before deploying).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## What's implemented (MVP scope)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Customer flow: QR landing → registration (name + PK phone, normalized server-side) → loyalty card → check-in → duplicate-scan state → reward unlock → reward code screen
+- Server-only stamp calculation, atomic check-in transaction, one-check-in-per-day DB constraint
+- Reward codes (`BRD-XXXXXX`), staff redemption flow with re-redemption/expiry blocking
+- Admin: dashboard KPIs, customer list, program settings (required stamps / reward name / validity — no code changes needed), QR code list + creation, password-gated
+- Design tokens as CSS vars (`--brod-*` in `globals.css`) — swap in real brand colors there
 
-## Deploy on Vercel
+## Deliberately out of scope for this MVP (see the full spec for the complete build)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- OTP/SMS verification for "continue as returning member" (currently phone-number lookup only — fine for a pilot, not for production trust)
+- Admin roles (single shared admin password, no SUPER_ADMIN/MANAGER/STAFF split)
+- Audit logs, QR scan analytics, rate limiting, PWA manifest/service worker
+- Multi-QR check-in analytics, social links/reviews being admin-configurable (currently placeholder link)
+- Automated tests (Playwright/unit) — the acceptance sequence from the spec was manually verified via API calls during this build
