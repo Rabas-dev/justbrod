@@ -64,10 +64,12 @@ async function unlockRewardIfEligible(
  * Atomic: a check-in, its stamp count, and any reward unlock happen together or not at all.
  */
 export async function addStamp(customerId: string): Promise<LoyaltyState> {
-  const program = await db.program.findFirst({ where: { active: true } });
+  const [program, customer] = await Promise.all([
+    db.program.findFirst({ where: { active: true } }),
+    db.customer.findUniqueOrThrow({ where: { id: customerId } }),
+  ]);
   if (!program) throw new CheckinError("PROGRAM_INACTIVE", "Brod Rewards is currently unavailable.");
 
-  const customer = await db.customer.findUniqueOrThrow({ where: { id: customerId } });
   const checkinDate = todayKey();
 
   const result = await db.$transaction(async (tx) => {
@@ -99,10 +101,11 @@ export async function addStamp(customerId: string): Promise<LoyaltyState> {
 
 /** Lets a cashier reverse the stamp they just gave (e.g. wrong customer scanned). */
 export async function undoLastStamp(customerId: string): Promise<LoyaltyState> {
-  const program = await db.program.findFirst({ where: { active: true } });
+  const [program, customer] = await Promise.all([
+    db.program.findFirst({ where: { active: true } }),
+    db.customer.findUniqueOrThrow({ where: { id: customerId } }),
+  ]);
   if (!program) throw new CheckinError("PROGRAM_INACTIVE", "Brod Rewards is currently unavailable.");
-
-  const customer = await db.customer.findUniqueOrThrow({ where: { id: customerId } });
 
   const last = await db.checkIn.findFirst({
     where: { customerId, programId: program.id },
@@ -117,8 +120,10 @@ export async function undoLastStamp(customerId: string): Promise<LoyaltyState> {
 }
 
 export async function getLoyaltyState(customerId: string): Promise<LoyaltyState> {
-  const customer = await db.customer.findUniqueOrThrow({ where: { id: customerId } });
-  const program = await db.program.findFirstOrThrow({ where: { active: true } });
+  const [customer, program] = await Promise.all([
+    db.customer.findUniqueOrThrow({ where: { id: customerId } }),
+    db.program.findFirstOrThrow({ where: { active: true } }),
+  ]);
 
   await db.$transaction((tx) => unlockRewardIfEligible(tx, customerId, program));
 
@@ -131,11 +136,13 @@ async function buildLoyaltyState(
   justCheckedIn: boolean,
   alreadyCheckedInToday: boolean
 ): Promise<LoyaltyState> {
-  const stamps = await db.checkIn.count({ where: { customerId: customer.id, programId: program.id } });
-  const reward = await db.reward.findFirst({
-    where: { customerId: customer.id, programId: program.id, status: "UNLOCKED" },
-    orderBy: { unlockedAt: "desc" },
-  });
+  const [stamps, reward] = await Promise.all([
+    db.checkIn.count({ where: { customerId: customer.id, programId: program.id } }),
+    db.reward.findFirst({
+      where: { customerId: customer.id, programId: program.id, status: "UNLOCKED" },
+      orderBy: { unlockedAt: "desc" },
+    }),
+  ]);
 
   return {
     customer: { id: customer.id, name: customer.name, phone: customer.phone, qrToken: customer.qrToken },
