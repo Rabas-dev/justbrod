@@ -1,53 +1,52 @@
 # Brod Digital Loyalty — MVP
 
-Mobile-first QR loyalty flow (scan → check-in → stamp → reward) plus a minimal admin panel, built per the Brod loyalty spec's cut-down v1 scope.
+Cashier-verified QR loyalty flow (customer shows a personal QR → cashier scans it after confirming a purchase → stamp added) plus a minimal admin panel.
 
 ## Stack
 
-- Next.js 15 (App Router) + TypeScript + Tailwind
+- Next.js 16 (App Router) + TypeScript + Tailwind
 - Postgres via Supabase, accessed through Prisma
-- Framer Motion for the stamp/reward animations
+- Framer Motion + `canvas-confetti` for the stamp/reward animations
+- `qrcode` (customer QR generation) + `qr-scanner` (cashier camera scanning)
 - Zod for request validation
 
 ## Getting started
 
-Needs two Supabase Postgres connection strings in `.env` (already configured for this project):
+```bash
+npm install
+npx prisma migrate deploy   # applies schema to the database
+npm run seed                # creates the default program
+npm run dev
+```
+
+Customer flow starts at `/rewards`. Admin/cashier starts at `/admin/login`.
+
+## Environment variables
 
 ```
 DATABASE_URL="<Supabase Transaction pooler string, port 6543, ?pgbouncer=true appended>"
 DIRECT_URL="<Supabase Session pooler string, port 5432 — used for migrations>"
-ADMIN_PASSWORD="<pick something real before deploying>"
+ADMIN_PASSWORD="<a real password, not the repo default>"
+ADMIN_SESSION_SECRET="<a long random string — openssl rand -base64 32>"
 ```
 
-Note: Supabase's true "direct connection" host (`db.<ref>.supabase.co`) is IPv6-only on this project's tier, so `DIRECT_URL` points at the pooler's session-mode port (5432) instead — that's what Prisma migrations use here.
+`ADMIN_SESSION_SECRET` signs the admin login cookie. If unset, the app falls back to signing with `ADMIN_PASSWORD`, which still works but means rotating the password also invalidates it as a signing key — set a dedicated secret for production.
 
-```bash
-npm install
-npx prisma migrate dev   # applies schema to Supabase (only needed after schema changes)
-npm run seed              # creates the default program + a demo QR code
-npm run dev
-```
+On Vercel: add all four in Project Settings → Environment Variables before the first deploy. `DIRECT_URL` is only needed if you run migrations from Vercel's build step; for a first deploy, running `npx prisma migrate deploy` locally against the same database is simpler.
 
-The seed command prints a scan URL like:
+## What's implemented
 
-```
-http://localhost:3000/rewards?q=<token>
-```
+- Customer flow: register/continue (name + PK phone) → loyalty card with a personal QR → cashier stamps it → reward unlock → reward code screen, with confetti on stamp/reward events
+- Cashier flow (`/admin/scan`): camera QR scan or manual phone lookup → confirm eligibility → add stamp (same-day duplicate guard) → short undo window
+- Server-only stamp calculation in an atomic transaction; reward eligibility is re-checked on every card load, not just at stamp time, so it self-heals if the program's required-stamp count changes later
+- Reward codes (`BRD-XXXXXX`, full-entropy uppercase alphanumeric), staff redemption flow with re-redemption/expiry blocking
+- Admin: dashboard KPIs, customer list, program settings, redeem screen — all behind a signed, time-limited session cookie
+- Rate limiting (per-IP, in-memory) on admin login, phone lookup/registration, and reward redemption
+- Security headers (CSP, X-Frame-Options, Permissions-Policy scoped to camera-on-`/admin/scan`, etc.) set in `next.config.ts`
 
-Open that URL to walk the customer flow. Admin is at `/admin` — password is `ADMIN_PASSWORD` in `.env` (defaults to `brod-admin-2026`, change before deploying).
+## Known limitations — read before a real launch
 
-## What's implemented (MVP scope)
-
-- Customer flow: QR landing → registration (name + PK phone, normalized server-side) → loyalty card → check-in → duplicate-scan state → reward unlock → reward code screen
-- Server-only stamp calculation, atomic check-in transaction, one-check-in-per-day DB constraint
-- Reward codes (`BRD-XXXXXX`), staff redemption flow with re-redemption/expiry blocking
-- Admin: dashboard KPIs, customer list, program settings (required stamps / reward name / validity — no code changes needed), QR code list + creation, password-gated
-- Design tokens as CSS vars (`--brod-*` in `globals.css`) — swap in real brand colors there
-
-## Deliberately out of scope for this MVP (see the full spec for the complete build)
-
-- OTP/SMS verification for "continue as returning member" (currently phone-number lookup only — fine for a pilot, not for production trust)
-- Admin roles (single shared admin password, no SUPER_ADMIN/MANAGER/STAFF split)
-- Audit logs, QR scan analytics, rate limiting, PWA manifest/service worker
-- Multi-QR check-in analytics, social links/reviews being admin-configurable (currently placeholder link)
-- Automated tests (Playwright/unit) — the acceptance sequence from the spec was manually verified via API calls during this build
+- **Phone-number login has no OTP.** `/rewards/continue` and the registration upsert log a browser in as whoever owns that phone number, with only rate limiting (5–8 attempts / 5 min per IP) standing in the way. Fine for an internal pilot; add SMS OTP before handling real customer data at scale.
+- **Rate limiting is in-memory per serverless instance.** It stops naive scripted abuse but isn't a hard guarantee under multi-region/multi-instance traffic on Vercel. For real production load, swap `src/lib/rateLimit.ts` for a shared store (Upstash Redis + `@upstash/ratelimit`).
+- Single shared admin password — no per-staff accounts, so the stamp audit trail says "staff," not who specifically gave it.
+- No automated test suite; flows were verified manually via the running app and direct API calls.

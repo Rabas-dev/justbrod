@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { normalizePakistaniPhone } from "@/lib/loyalty/phone";
 import { setSessionCustomerId } from "@/lib/loyalty/session";
+import { rateLimit } from "@/lib/rateLimit";
 
 const schema = z.object({
   name: z.string().trim().min(2, "Please enter your name").max(60),
@@ -10,6 +11,12 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  // Upserting on an existing phone also logs the caller in as that customer (no OTP),
+  // so this shares the same rate limit as /api/loyalty/lookup.
+  if (!rateLimit(req, "loyalty-lookup", 8, 5 * 60 * 1000)) {
+    return NextResponse.json({ error: "Too many attempts. Try again in a few minutes." }, { status: 429 });
+  }
+
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {

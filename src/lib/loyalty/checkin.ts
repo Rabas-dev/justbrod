@@ -1,16 +1,20 @@
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { LoyaltyState } from "./types";
 
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // cashier can undo a mis-tap within 2 minutes
 
+// Generated directly from an uppercase alphanumeric alphabet (36 symbols) so every character
+// carries full entropy — nanoid() + .toUpperCase() would fold cases together and lose bits.
+const generateRewardSuffix = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 6);
+
 function todayKey() {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
 function rewardCode() {
-  return `BRD-${nanoid(6).toUpperCase()}`;
+  return `BRD-${generateRewardSuffix()}`;
 }
 
 export class CheckinError extends Error {
