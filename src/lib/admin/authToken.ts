@@ -26,11 +26,12 @@ async function hmacKey(secret: string) {
   ]);
 }
 
-export async function createSignedToken(secret: string): Promise<string> {
+export async function createSignedToken(secret: string, role: string): Promise<string> {
   const issuedAt = Math.floor(Date.now() / 1000).toString();
+  const payload = `${issuedAt}.${role}`;
   const key = await hmacKey(secret);
-  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(issuedAt));
-  return `${issuedAt}.${bufToBase64Url(signature)}`;
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+  return `${payload}.${bufToBase64Url(signature)}`;
 }
 
 /** Constant-time comparison (via fixed-size digests, so length differences don't leak either). */
@@ -50,19 +51,21 @@ export async function verifySignedToken(
   token: string | undefined,
   secret: string,
   maxAgeSeconds: number
-): Promise<boolean> {
-  if (!token) return false;
-  const [issuedAt, signatureB64] = token.split(".");
-  if (!issuedAt || !signatureB64) return false;
+): Promise<string | null> {
+  if (!token) return null;
+  const [issuedAt, role, signatureB64] = token.split(".");
+  if (!issuedAt || !role || !signatureB64) return null;
 
   const issuedAtNum = Number(issuedAt);
-  if (!Number.isFinite(issuedAtNum)) return false;
-  if (Math.floor(Date.now() / 1000) - issuedAtNum > maxAgeSeconds) return false;
+  if (!Number.isFinite(issuedAtNum)) return null;
+  if (Math.floor(Date.now() / 1000) - issuedAtNum > maxAgeSeconds) return null;
 
   try {
     const key = await hmacKey(secret);
-    return await crypto.subtle.verify("HMAC", key, base64UrlToBuf(signatureB64), encoder.encode(issuedAt));
+    const payload = `${issuedAt}.${role}`;
+    const valid = await crypto.subtle.verify("HMAC", key, base64UrlToBuf(signatureB64), encoder.encode(payload));
+    return valid ? role : null;
   } catch {
-    return false;
+    return null;
   }
 }

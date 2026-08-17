@@ -4,6 +4,8 @@ import { createSignedToken, verifySignedToken } from "./authToken";
 const COOKIE_NAME = "brod_admin";
 const MAX_AGE_SECONDS = 60 * 60 * 12;
 
+export type AdminRole = "admin" | "cashier";
+
 // Falls back to ADMIN_PASSWORD so the app still works without extra setup, but a dedicated
 // secret is stronger (the password is also used for brute-force-able login attempts).
 function getSecret(): string {
@@ -12,14 +14,19 @@ function getSecret(): string {
   return secret;
 }
 
-export async function isAdminAuthed(): Promise<boolean> {
+export async function getAdminRole(): Promise<AdminRole | null> {
   const store = await cookies();
-  return verifySignedToken(store.get(COOKIE_NAME)?.value, getSecret(), MAX_AGE_SECONDS);
+  const role = await verifySignedToken(store.get(COOKIE_NAME)?.value, getSecret(), MAX_AGE_SECONDS);
+  return role === "admin" || role === "cashier" ? role : null;
 }
 
-export async function setAdminAuthed() {
+export async function isAdminAuthed(): Promise<boolean> {
+  return (await getAdminRole()) !== null;
+}
+
+export async function setAdminAuthed(role: AdminRole) {
   const store = await cookies();
-  const token = await createSignedToken(getSecret());
+  const token = await createSignedToken(getSecret(), role);
   store.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

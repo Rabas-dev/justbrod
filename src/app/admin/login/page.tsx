@@ -26,7 +26,7 @@ export default function AdminLogin() {
         setError(data.error ?? "Something went wrong.");
         return;
       }
-      router.push("/admin");
+      router.push(data.role === "cashier" ? "/admin/scan" : "/admin");
       router.refresh();
     } finally {
       setLoading(false);
@@ -37,8 +37,8 @@ export default function AdminLogin() {
     <div className="flex min-h-dvh items-center justify-center bg-brod-secondary px-6">
       <form onSubmit={submit} className="w-full max-w-sm rounded-2xl bg-brod-background p-8 shadow-xl">
         <Logo variant="orange" height={20} />
-        <h1 className="mt-4 text-xl font-bold text-brod-secondary">Admin</h1>
-        <p className="mt-1 text-sm text-brod-muted">Sign in to manage the loyalty program.</p>
+        <h1 className="mt-4 text-xl font-bold text-brod-secondary">Sign In</h1>
+        <p className="mt-1 text-sm text-brod-muted">Admin or cashier — enter your password.</p>
 
         <input
           required
@@ -46,7 +46,7 @@ export default function AdminLogin() {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Admin password"
+          placeholder="Password"
           className="mt-6 w-full rounded-xl border border-brod-border bg-brod-surface px-4 py-3 text-brod-text outline-none focus:border-brod-primary"
         />
 

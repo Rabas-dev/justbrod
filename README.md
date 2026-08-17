@@ -28,11 +28,14 @@ DATABASE_URL="<Supabase Transaction pooler string, port 6543, ?pgbouncer=true ap
 DIRECT_URL="<Supabase Session pooler string, port 5432 — used for migrations>"
 ADMIN_PASSWORD="<a real password, not the repo default>"
 ADMIN_SESSION_SECRET="<a long random string — openssl rand -base64 32>"
+CASHIER_PASSWORD="<a separate password for cashier-only logins>"
 ```
 
 `ADMIN_SESSION_SECRET` signs the admin login cookie. If unset, the app falls back to signing with `ADMIN_PASSWORD`, which still works but means rotating the password also invalidates it as a signing key — set a dedicated secret for production.
 
-On Vercel: add all four in Project Settings → Environment Variables before the first deploy. `DIRECT_URL` is only needed if you run migrations from Vercel's build step; for a first deploy, running `npx prisma migrate deploy` locally against the same database is simpler.
+`CASHIER_PASSWORD` is optional — logging in with it grants a restricted "cashier" session that can only reach `/admin/scan` and its lookup/stamp APIs; every other admin page and API route (dashboard, customers, redeem, program) 403s/redirects away. Leave it unset if you don't need a separate cashier login.
+
+On Vercel: add these in Project Settings → Environment Variables before the first deploy. `DIRECT_URL` is only needed if you run migrations from Vercel's build step; for a first deploy, running `npx prisma migrate deploy` locally against the same database is simpler.
 
 ## What's implemented
 

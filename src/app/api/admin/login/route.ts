@@ -12,13 +12,20 @@ export async function POST(req: NextRequest) {
   }
 
   const parsed = schema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Enter the admin password." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Enter the password." }, { status: 400 });
 
-  const expected = process.env.ADMIN_PASSWORD;
-  if (!expected || !(await timingSafeStringEqual(parsed.data.password, expected))) {
-    return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const cashierPassword = process.env.CASHIER_PASSWORD;
+
+  if (adminPassword && (await timingSafeStringEqual(parsed.data.password, adminPassword))) {
+    await setAdminAuthed("admin");
+    return NextResponse.json({ ok: true, role: "admin" });
   }
 
-  await setAdminAuthed();
-  return NextResponse.json({ ok: true });
+  if (cashierPassword && (await timingSafeStringEqual(parsed.data.password, cashierPassword))) {
+    await setAdminAuthed("cashier");
+    return NextResponse.json({ ok: true, role: "cashier" });
+  }
+
+  return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
 }
