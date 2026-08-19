@@ -4,18 +4,30 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/shared/Button";
 import { WaveIcon } from "@/components/icons/AnimatedIcons";
+import { normalizePakistaniPhone } from "@/lib/loyalty/phone";
 
 export default function Onboarding() {
   const router = useRouter();
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneTouched, setPhoneTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const phoneValid = normalizePakistaniPhone(phone) !== null;
+  const showPhoneError = phoneTouched && phone.length > 0 && !phoneValid;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (!phoneValid) {
+      setPhoneTouched(true);
+      setError("Enter a valid Pakistani mobile number, e.g. 03XX XXXXXXX.");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/loyalty/register", {
@@ -62,9 +74,16 @@ export default function Onboarding() {
               inputMode="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              onBlur={() => setPhoneTouched(true)}
               placeholder="03XX XXXXXXX"
-              className="w-full rounded-xl border border-brod-border bg-brod-surface px-4 py-3 text-brod-text outline-none focus:border-brod-primary"
+              aria-invalid={showPhoneError}
+              className={`w-full rounded-xl border bg-brod-surface px-4 py-3 text-brod-text outline-none ${
+                showPhoneError ? "border-brod-danger" : "border-brod-border focus:border-brod-primary"
+              }`}
             />
+            {showPhoneError && (
+              <p className="mt-1.5 text-xs text-brod-danger">Enter a valid Pakistani mobile number, e.g. 03XX XXXXXXX.</p>
+            )}
           </div>
 
           {error && <p className="text-sm text-brod-danger">{error}</p>}
