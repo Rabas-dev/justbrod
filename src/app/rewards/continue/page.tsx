@@ -23,7 +23,6 @@ export default function Continue() {
 
     if (!phoneValid) {
       setPhoneTouched(true);
-      setError("Enter a valid 11-digit Pakistani mobile number, e.g. 03XXXXXXXXX.");
       return;
     }
 
@@ -73,9 +72,7 @@ export default function Continue() {
               }`}
             />
             {showPhoneError && (
-              <p className="mt-1.5 text-xs text-brod-danger">
-                Enter a valid 11-digit Pakistani mobile number, e.g. 03XXXXXXXXX.
-              </p>
+              <p className="mt-1.5 text-xs text-brod-danger">Enter a valid number.</p>
             )}
           </div>
 
