@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/shared/Button";
 import { WaveIcon } from "@/components/icons/AnimatedIcons";
-import { normalizePakistaniPhone } from "@/lib/loyalty/phone";
+import { normalizePakistaniPhone, sanitizePhoneInput } from "@/lib/loyalty/phone";
 
 export default function Onboarding() {
   const router = useRouter();
@@ -16,7 +16,7 @@ export default function Onboarding() {
   const [loading, setLoading] = useState(false);
 
   const phoneValid = normalizePakistaniPhone(phone) !== null;
-  const showPhoneError = phoneTouched && phone.length > 0 && !phoneValid;
+  const showPhoneError = (phoneTouched && phone.length > 0 && !phoneValid) || (phone.length === 11 && !phoneValid);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -24,7 +24,7 @@ export default function Onboarding() {
 
     if (!phoneValid) {
       setPhoneTouched(true);
-      setError("Enter a valid Pakistani mobile number, e.g. 03XX XXXXXXX.");
+      setError("Enter a valid 11-digit Pakistani mobile number, e.g. 03XXXXXXXXX.");
       return;
     }
 
@@ -71,18 +71,21 @@ export default function Onboarding() {
             <label className="mb-1.5 block text-sm font-medium text-brod-secondary">Mobile number</label>
             <input
               required
-              inputMode="tel"
+              inputMode="numeric"
+              maxLength={11}
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
               onBlur={() => setPhoneTouched(true)}
-              placeholder="03XX XXXXXXX"
+              placeholder="03XXXXXXXXX"
               aria-invalid={showPhoneError}
               className={`w-full rounded-xl border bg-brod-surface px-4 py-3 text-brod-text outline-none ${
                 showPhoneError ? "border-brod-danger" : "border-brod-border focus:border-brod-primary"
               }`}
             />
             {showPhoneError && (
-              <p className="mt-1.5 text-xs text-brod-danger">Enter a valid Pakistani mobile number, e.g. 03XX XXXXXXX.</p>
+              <p className="mt-1.5 text-xs text-brod-danger">
+                Enter a valid 11-digit Pakistani mobile number, e.g. 03XXXXXXXXX.
+              </p>
             )}
           </div>
 

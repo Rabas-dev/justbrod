@@ -1,3 +1,8 @@
+/** Strips non-digits and caps to 11 chars, matching the local 03XXXXXXXXX format shown in the input. */
+export function sanitizePhoneInput(raw: string): string {
+  return raw.replace(/[^\d]/g, "").slice(0, 11);
+}
+
 /** Normalizes Pakistani mobile numbers to +92XXXXXXXXXX. Returns null if invalid. */
 export function normalizePakistaniPhone(raw: string): string | null {
   const digits = raw.replace(/[^\d]/g, "");
